@@ -72,7 +72,7 @@ class ActionExecutor(private val context: Context) {
 
             delay(500)
 
-            val image: Image? = imageReader.acquireLatestImage()
+            val image: Image = imageReader.acquireLatestImage()
                 ?: return JSONObject().apply {
                     put("success", false)
                     put("error", "Failed to capture frame")
