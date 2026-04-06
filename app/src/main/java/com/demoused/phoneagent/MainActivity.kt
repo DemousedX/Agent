@@ -2,6 +2,7 @@ package com.demoused.phoneagent
 
 import android.Manifest
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.os.Build
@@ -15,6 +16,7 @@ import com.demoused.phoneagent.databinding.ActivityMainBinding
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private lateinit var prefs: SharedPreferences
     private lateinit var projectionManager: MediaProjectionManager
 
     private val projectionLauncher = registerForActivityResult(
@@ -26,13 +28,8 @@ class MainActivity : AppCompatActivity() {
             )
             AgentService.mediaProjection?.registerCallback(object :
                 android.media.projection.MediaProjection.Callback() {
-                override fun onStop() {
-                    AgentService.mediaProjection = null
-                }
+                override fun onStop() { AgentService.mediaProjection = null }
             }, null)
-            toast("✅ Дозвіл на скріншот отримано")
-        } else {
-            toast("⚠️ Скріншоти недоступні без дозволу")
         }
         startAgentService()
     }
@@ -46,16 +43,32 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        prefs = getSharedPreferences("agent_prefs", MODE_PRIVATE)
         projectionManager = getSystemService(MediaProjectionManager::class.java)
 
-        binding.etServerUrl.setText("ws://192.168.1.100:8765/ws")
+        // Load saved values
+        binding.etBotToken.setText(prefs.getString("bot_token", ""))
+        binding.etGroqKey.setText(prefs.getString("groq_key", ""))
+        binding.etUserId.setText(
+            prefs.getLong("allowed_user_id", 0L).let { if (it == 0L) "" else it.toString() }
+        )
 
         binding.btnStart.setOnClickListener {
-            val url = binding.etServerUrl.text.toString().trim()
-            if (url.isBlank()) {
-                toast("Введіть URL сервера")
+            val token = binding.etBotToken.text.toString().trim()
+            val groqKey = binding.etGroqKey.text.toString().trim()
+            val userId = binding.etUserId.text.toString().trim().toLongOrNull() ?: 0L
+
+            if (token.isBlank() || groqKey.isBlank()) {
+                toast("Заповни Bot Token і Groq API Key")
                 return@setOnClickListener
             }
+
+            prefs.edit()
+                .putString("bot_token", token)
+                .putString("groq_key", groqKey)
+                .putLong("allowed_user_id", userId)
+                .apply()
+
             requestPermissionsAndStart()
         }
 
@@ -68,8 +81,7 @@ class MainActivity : AppCompatActivity() {
     private fun requestPermissionsAndStart() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
-            ) {
+                != PackageManager.PERMISSION_GRANTED) {
                 notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                 return
             }
@@ -78,19 +90,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startProjectionRequest() {
-        toast("Дозвольте захоплення екрану для скріншотів")
         projectionLauncher.launch(projectionManager.createScreenCaptureIntent())
     }
 
     private fun startAgentService() {
-        val url = binding.etServerUrl.text.toString().trim()
-        val intent = Intent(this, AgentService::class.java).apply {
-            putExtra(AgentService.EXTRA_WS_URL, url)
-        }
-        ContextCompat.startForegroundService(this, intent)
+        ContextCompat.startForegroundService(this, Intent(this, AgentService::class.java))
         toast("🚀 Агент запущено")
     }
 
-    private fun toast(msg: String) =
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+    private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 }
