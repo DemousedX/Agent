@@ -46,23 +46,21 @@ class MainActivity : AppCompatActivity() {
         prefs = getSharedPreferences("agent_prefs", MODE_PRIVATE)
         projectionManager = getSystemService(MediaProjectionManager::class.java)
 
-        // Load saved values
+        // Завантажуємо збережені значення
         binding.etBotToken.setText(prefs.getString("bot_token", ""))
         binding.etGroqKey.setText(prefs.getString("groq_key", ""))
-        binding.etUserId.setText(
-            prefs.getLong("allowed_user_id", 0L).let { if (it == 0L) "" else it.toString() }
-        )
+        val savedUserId = prefs.getLong("allowed_user_id", 0L)
+        if (savedUserId != 0L) binding.etUserId.setText(savedUserId.toString())
 
         binding.btnStart.setOnClickListener {
             val token = binding.etBotToken.text.toString().trim()
             val groqKey = binding.etGroqKey.text.toString().trim()
             val userId = binding.etUserId.text.toString().trim().toLongOrNull() ?: 0L
 
-            if (token.isBlank() || groqKey.isBlank()) {
-                toast("Заповни Bot Token і Groq API Key")
-                return@setOnClickListener
-            }
+            if (token.isBlank()) { toast("Введи Bot Token"); return@setOnClickListener }
+            if (groqKey.isBlank()) { toast("Введи Groq API Key"); return@setOnClickListener }
 
+            // Зберігаємо перед запуском
             prefs.edit()
                 .putString("bot_token", token)
                 .putString("groq_key", groqKey)
@@ -79,12 +77,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestPermissionsAndStart() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED) {
-                notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                return
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED) {
+            notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            return
         }
         startProjectionRequest()
     }

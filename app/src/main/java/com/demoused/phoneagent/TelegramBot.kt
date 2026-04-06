@@ -1,6 +1,5 @@
 package com.demoused.phoneagent
 
-import android.util.Log
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -17,13 +16,11 @@ data class TgUpdate(
 
 class TelegramBot(private val token: String) {
 
-    companion object { const val TAG = "TelegramBot" }
-
     private val base = "https://api.telegram.org/bot$token"
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(40, TimeUnit.SECONDS) // long poll timeout
+        .readTimeout(40, TimeUnit.SECONDS)
         .writeTimeout(10, TimeUnit.SECONDS)
         .build()
 
@@ -35,24 +32,27 @@ class TelegramBot(private val token: String) {
         val body = response.body?.string() ?: return emptyList()
         val json = JSONObject(body)
         if (!json.optBoolean("ok")) return emptyList()
+
         val results = json.getJSONArray("result")
         val updates = mutableListOf<TgUpdate>()
+
         for (i in 0 until results.length()) {
             val upd = results.getJSONObject(i)
             val updId = upd.getLong("update_id")
             offset = updId + 1
+
             val msg = upd.optJSONObject("message") ?: continue
-            val text = msg.optString("text", "").ifBlank { continue }
+            val text = msg.optString("text", "")
+            if (text.isBlank()) continue
             val from = msg.optJSONObject("from") ?: continue
-            updates.add(
-                TgUpdate(
-                    updateId = updId,
-                    chatId = msg.getJSONObject("chat").getLong("id"),
-                    userId = from.getLong("id"),
-                    text = text,
-                    messageId = msg.getLong("message_id"),
-                )
-            )
+
+            updates.add(TgUpdate(
+                updateId = updId,
+                chatId = msg.getJSONObject("chat").getLong("id"),
+                userId = from.getLong("id"),
+                text = text,
+                messageId = msg.getLong("message_id"),
+            ))
         }
         return updates
     }
