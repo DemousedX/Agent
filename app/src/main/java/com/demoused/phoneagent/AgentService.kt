@@ -55,18 +55,21 @@ class AgentService : Service() {
     private suspend fun pollLoop() {
         updateNotification("✅ Бот активний, чекаю команд...")
         Log.i(TAG, "Polling started")
-        while (isActive) {
-            try {
-                val updates = withContext(Dispatchers.IO) { bot.getUpdates() }
-                for (update in updates) {
-                    launch { handleUpdate(update) }
+    
+        coroutineScope {
+            while (isActive) {
+                try {
+                    val updates = withContext(Dispatchers.IO) { bot.getUpdates() }
+                    for (update in updates) {
+                        launch { handleUpdate(update) }
+                    }
+                } catch (e: CancellationException) {
+                    break
+                } catch (e: Exception) {
+                    Log.e(TAG, "Poll error: ${e.message}")
+                    delay(5_000)
                 }
-            } catch (e: CancellationException) {
-                break
-            } catch (e: Exception) {
-                Log.e(TAG, "Poll error: ${e.message}")
-                delay(5_000)
-            }
+           }
         }
     }
 
